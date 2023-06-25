@@ -1,4 +1,4 @@
-from models.Models.BackBone.backBone_unet import *
+from MyModel.Models.BackBone.backBone_unet import *
 
 
 class UNet(nn.Module):

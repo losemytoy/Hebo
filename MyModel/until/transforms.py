@@ -90,13 +90,14 @@ class CenterCrop(object):
 class ToTensor(object):
     def __call__(self, image, target):
         # image = F.to_tensor(image)
+        # target = torch.as_tensor(np.array(target), dtype=torch.int64)
         image, target = np.array(image), np.array(target)
         image = np.transpose(image, (2, 0, 1))
         image = image / 255.0
-        image = torch.tensor(image)
+        image = torch.Tensor(image)
         target = np.expand_dims(target, axis=0)
         target = target / 255.0
-        target = torch.tensor(target)
+        target = torch.Tensor(target)
         return image, target
 
 

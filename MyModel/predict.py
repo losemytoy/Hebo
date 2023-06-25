@@ -5,7 +5,10 @@ from torchvision import transforms
 import numpy as np
 from PIL import Image
 from matplotlib import pyplot as plt
-from Models.UNet import UNet
+
+from MyModel.Models.ResUNet import ResUNet
+from MyModel.Models.UNet import UNet
+from MyModel.Models.DeepLabV3plus import DeepLabV3plus
 
 
 def main():
@@ -13,8 +16,9 @@ def main():
     classes = 1
 
     # check files
-    weights_path = './pre_weights/water_bodies_model.pth'
-    img_path = 'water_body_100.jpg'
+    weights_path = './pre_weights/deeplab_checkpoint_0.1396.pth'
+    img_path = 'D:/OneDrive - The University of Nottingham/Dissertation/Data/ResearchData/Test/Snipaste_2023-06-23_10-10-59.png'
+    # img_path = './copernicus_s2_sr_1280.jpg'
     assert os.path.exists(weights_path), f"weights {weights_path} not found."
     assert os.path.exists(img_path), f"weights {img_path} not found."
 
@@ -22,13 +26,12 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # create model
-    model = UNet(3, 1)
+    # model = UNet(3, 1)
+    model = DeepLabV3plus(num_classes=1, backbone="mobilenet", downsample_factor=16, pretrained=False)
+    # model = ResUNet(num_classes=1)
 
     # delete weights about aux_classifier
-    weights_dict = torch.load(weights_path, map_location='cpu')
-    # for k in list(weights_dict.keys()):
-    #     if "aux" in k:
-    #         del weights_dict[k]
+    weights_dict = torch.load(weights_path, map_location='cpu')['model']
 
     # load weights
     model.load_state_dict(weights_dict)
@@ -36,6 +39,7 @@ def main():
 
     # preprocess image
     img_transforms = transforms.Compose([transforms.Resize(256),
+                                         transforms.CenterCrop(256), #todo deeplabv3+ don't need this operation, resUNet have to crop the size,
                                          transforms.ToTensor(),
                                          transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))])
 
@@ -50,19 +54,23 @@ def main():
         model(init_img)
 
         t_start = time.time()
-        output = model(img.to(device))
+        output = model(img.to(device)).cpu()
         t_end = time.time()
         print("inference time: {}".format(t_end - t_start))
 
-        prediction = output.argmax(1).squeeze(0)
-        prediction = prediction.to("cpu").numpy().astype(np.uint8)
+        output = output.permute(0, 2, 3, 1)
+        output = output.numpy()
+        prediction = np.concatenate(output, axis=1)
+
+        # prediction = output.argmax(1).squeeze(0)
+        # prediction = prediction.to("cpu").numpy()
         # mask = Image.fromarray(prediction)
         # mask.save("predict_result.png")
 
     plt.subplot(121)
     plt.imshow(np.array(original_img))
     plt.subplot(122)
-    plt.imshow(prediction)
+    plt.imshow(prediction, cmap='gray')
     plt.show()
 
 
