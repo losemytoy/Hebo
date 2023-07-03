@@ -32,29 +32,14 @@ def createModel(num_classes, pretrain=False):
     return model
 
 
-def visualization(epochs, train_losses, train_dices, val_losses, val_dices):
-    plt.figure(figsize=(10, 6))
-    plt.subplot(1, 2, 1)
-    plt.plot(np.arange(epochs), train_dices)
-    plt.plot(np.arange(epochs), val_dices)
-    plt.xlabel("Epoch")
-    plt.ylabel("DICE Coeff")
-    plt.legend(["Train DICE", "Val DICE"])
-    plt.subplot(1, 2, 2)
-    plt.plot(np.arange(epochs), train_losses)
-    plt.plot(np.arange(epochs), val_losses)
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.legend(["Train Loss", "Val Loss"])
-
-
 def train(epochs=10):
     # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     device = torch.device('cpu')
     ################### Dataset & DataLoader ##############################
     # root_path = 'D:/OneDrive - The University of Nottingham/Dissertation/Data/Water_Bodies_Dataset/'
-    root_path = 'D:/OneDrive - The University of Nottingham/Dissertation/Data/ResearchData/'
+    # root_path = 'D:/OneDrive - The University of Nottingham/Dissertation/Data/ResearchData/'
     # root_path = '../ResearchData'
+    root_path = 'D:/OneDrive - The University of Nottingham/Dissertation/Data/5_channels_dataset/'
 
     image_folder = os.path.join(root_path, 'Images')
     mask_folder = os.path.join(root_path, 'Masks')
@@ -104,7 +89,7 @@ def train(epochs=10):
     for epoch in tqdm(range(epochs)):
         model.train()
         train_loss = 0
-        # train_dice = 0
+        train_dice = 0
         train_show = 0
         for i, (images, masks) in enumerate(train_loader):
             images, masks = images.to(device, dtype=torch.float32), masks.to(device, dtype=torch.float32)
@@ -116,21 +101,21 @@ def train(epochs=10):
             l.backward()
             optimizer.step()
             train_loss += l.item()
-            # train_dice += dice_coeff(logits, masks)
+            train_dice += dice_coeff(logits, masks)
             total_train_step += 1
             train_show = l.item()
             if total_train_step % 100 == 0:
                 print("number of training: {}, Loss: {}".format(total_train_step, l.item()))
         # writer.add_scalar("train_loss", train_show, epoch)
         train_loss /= len(train_loader)
-        # train_dice /= len(train_loader)
+        train_dice /= len(train_loader)
         train_losses.append(train_loss)
-        # train_dices.append(train_dice)
+        train_dices.append(train_dice)
 
         # Validation
         model.eval()
         val_loss = 0
-        # val_dice = 0
+        val_dice = 0
         total_test_loss = 0
         total_accuracy = 0
         test_show = 0
@@ -142,28 +127,46 @@ def train(epochs=10):
                 masks = torch.squeeze(masks)
                 l = loss_fn(logits, masks)
                 val_loss += l.item()
-                # val_dice += dice_coeff(logits, masks)
+                val_dice += dice_coeff(logits, masks)
                 total_test_step += 1
                 test_show = l.item()
                 if total_test_step % 100 == 0:
                     print("number of training: {}, Loss: {}".format(total_test_step, l.item()))
         writer.add_scalar("loss/train_loss", train_show, epoch)
         writer.add_scalar("loss/test_loss", test_show, epoch)
-        print("accuracy in test_data: {}".format(total_accuracy / test_data_size))
+        # print("accuracy in test_data: {}".format(total_accuracy / test_data_size))
 
         total_test_step += 1
         val_loss /= len(val_loader)
-        # val_dice /= len(val_loader)
+        val_dice /= len(val_loader)
         val_losses.append(val_loss)
-        # val_dices.append(val_dice)
+        val_dices.append(val_dice)
         print(
-            f"Epoch: {epoch + 1}  Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
+            f"Epoch: {epoch + 1}  Train Loss: {train_loss:.4f} | Train DICE Coeff: {train_dice:.4f} | "
+            f"Val Loss: {val_loss:.4f} | Val DICE Coeff: {val_dice:.4f}")
 
         if (epoch+1) % 10 == 0:
-            save_file = {"model": model.state_dict(), "optimizer": optimizer.state_dict(),
-                         # "lr_scheduler": lr_scheduler.state_dict(),
+            save_file = {"model": model.state_dict(),
+                         "optimizer": optimizer.state_dict(),
+                         "lr_scheduler": scheduler.state_dict(),
                          "epoch": epoch + 1}
             torch.save(save_file, f"/root/autodl-tmp/save_weights/resUNet_checkpoint_{train_loss:.4f}.pth")
+
+        save_interval = 10  # int(max_epoch/6)
+        if epoch > int(epochs / 2) and (epoch + 1) % save_interval == 0:
+            save_file = {"model": model.state_dict(),
+                         "optimizer": optimizer.state_dict(),
+                         "lr_scheduler": scheduler.state_dict(),
+                         "epoch": epoch + 1}
+            torch.save(save_file, f"/root/autodl-tmp/save_weights/resUNet_checkpoint_{train_loss:.4f}.pth")
+
+        if epoch >= epochs - 1:
+            save_file = {"model": model.state_dict(),
+                         "optimizer": optimizer.state_dict(),
+                         "lr_scheduler": scheduler.state_dict(),
+                         "epoch": epoch + 1}
+            torch.save(save_file, f"/root/autodl-tmp/save_weights/resUNet_checkpoint_{train_loss:.4f}.pth")
+            break
 
         scheduler.step()
 

@@ -2,14 +2,17 @@ import time
 
 import cv2
 import numpy as np
+from PIL import Image
 
 from train import *
 import torch
+import os
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from matplotlib import pyplot as plt
+from torchvision import transforms
 
 
 class Evaluator(object):
@@ -87,7 +90,7 @@ class Evaluator(object):
 
     def _generate_matrix(self, gt_image, pre_image):
         mask = (gt_image >= 0) & (gt_image < self.num_class)
-        label = self.num_class * gt_image[mask].astype('int') + pre_image[mask]
+        label = self.num_class * gt_image[mask].astype('int') + pre_image[mask].astype('int')
         count = np.bincount(label, minlength=self.num_class ** 2)
         confusion_matrix = count.reshape(self.num_class, self.num_class)
         return confusion_matrix
@@ -103,7 +106,7 @@ class Evaluator(object):
 
 def main():
     num_classes = 1
-    weights_path = './pre_weights/resUNet_checkpoint_0.1891.pth'
+    weights_path = './pre_weights/deeplab_checkpoint_0.1396.pth'
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = torch.device("cpu")
     # model = ResUNet(num_classes=num_classes)
@@ -125,125 +128,132 @@ def main():
 
     test_set = Segmentation(test_images, image_folder, mask_folder, train_val='test')
 
-    # sum_1 = 0  # 累加每张图片val的accuracy
-    # sum_2 = 0  # 累积每张图片Val的mIoU
-    #
-    #
-    # for i in range(len(test_images)):
-    #     image = cv2.imread("D:/OneDrive - The University of Nottingham/Dissertation/Data/ResearchData/Images/%s" % test_images[i], -1)
-    #     label = cv2.imread("D:/OneDrive - The University of Nottingham/Dissertation/Data/ResearchData/Masks/%s" % test_images[i], -1)
-    #
-    #     orininal_h = image.shape[0]  # 读取的图像的高
-    #     orininal_w = image.shape[1]  # 读取的图像的宽
-    #
-    #     image = cv2.resize(image, dsize=(256, 256))
-    #     label = cv2.resize(label, dsize=(256, 256))
-    #
-    #     label[label >= 0.5] = 1  # label被resize后像素值会改变,调整像素值为原来的两类
-    #     label[label < 0.5] = 0
-    #
-    #     image = image / 255.0  # 图像归一化
-    #     image = torch.from_numpy(image)
-    #     image = image.permute(2, 0, 1)  # 显式的调转维度
-    #
-    #     image = torch.unsqueeze(image, dim=0)  # 改变维度,使得符合model input size
-    #
-    #     predict = model(image.to(device, dtype=torch.float32)).cpu()
-    #
-    #
-    #     predict = torch.squeeze(predict,dim=0)  # [1,1,416,416]---->[1,416,416]
-    #     predict = predict.permute(1, 2, 0)
-    #
-    #     predict = predict.detach().numpy()
-    #
-    #     prc = predict.argmax(axis=-1)
-    #
-    #     # 进行mIoU和accuracy的评测
-    #     imgPredict = prc
-    #     imgLabel = label
-    #
-    #     metric = Evaluator(2)
-    #     metric.add_batch(imgPredict, imgLabel)
-    #     acc = metric.Pixel_Accuracy_Class()
-    #     sum_1 += acc
-    #     mIoU = metric.meanIntersectionOverUnion()
-    #     sum_2 += mIoU
-    #     print("%s.jpg :" % test_images[i])
-    #     print("accuracy:  " + str(acc * 100) + " %")
-    #     print("mIoU:  " + str(mIoU))
-    #     print("-------------------")
-    #
-    # # 全部图片平均的accuracy和mIoU
-    # sum_1 = sum_1 / len(test_images)
-    # sum_2 = sum_2 / len(test_images)
-    #
-    # sum_1 = round(sum_1, 5)
-    # sum_2 = round(sum_2, 4)
-    #
-    # print("M accuracy:  " + str(sum_1 * 100) + " %")
-    # print("M mIoU:  " + str(sum_2))
+    img_transforms = transforms.Compose([transforms.Resize(256),
+                                         transforms.CenterCrop(256),
+                                         transforms.ToTensor(),
+                                         transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))])
 
-    sum_accuracy = 0
-    sum_mIou = 0
-    with torch.no_grad():
-        test_loader = DataLoader(
-            test_set,
-            batch_size=2,
-            num_workers=0,
-            shuffle=True,
-            pin_memory=True
-        )
-        for images, masks in tqdm(test_loader):
-            img_height, img_width = images.shape[-2:]
-            init_img = torch.zeros((1, 3, img_height, img_width), device=device)
-            model(init_img)
+    sum_1 = 0  # 累加每张图片val的accuracy
+    sum_2 = 0  # 累积每张图片Val的mIoU
 
-            t_start = time.time()
-            output = model(images.to(device, dtype=torch.float32)).cpu()
-            t_end = time.time()
-            print("inference time: {}".format(t_end - t_start))
-            masks[masks >= 0.5] = 1
-            masks[masks < 0.5] = 0
+    image = Image.open("D:/OneDrive - The University of Nottingham/Dissertation/Data/ResearchData/Images/8.png")
+    label = cv2.imread("D:/OneDrive - The University of Nottingham/Dissertation/Data/ResearchData/Masks/8.png", cv2.IMREAD_GRAYSCALE)
 
-            # output = output.permute(0, 2, 3, 1)
-            # output = output.numpy()
-            # prediction = np.concatenate(output, axis=1)
-            # predictions = output.argmax(dim=1)
-            # predictions = torch.squeeze(output)
-            # masks = torch.squeeze(masks)
-            results = []
-            for i in range(output.shape[0]):
+    # orininal_h = image.shape[0]  # 读取的图像的高
+    # orininal_w = image.shape[1]  # 读取的图像的宽
 
-                # prediction = output[i].cpu()
-                # predict = prediction.permute(1, 2, 0)
-                # prc = predict.numpy()
-                # prc = predict.argmax(axis=-1)
-                prediction = output[i].cpu()
-                prediction = prediction.permute(1, 2, 0)
-                prediction = prediction.numpy()
-                prc = np.concatenate(prediction, axis=1)
-                # prc = predictions[i].cpu().numpy()
-                prc = np.where(prc >= 0.5, 1, 0)
-                evaluator.add_batch(pre_image=prc, gt_image=masks[i][0].cpu().numpy())
-                # mask_name = masks[i]
-                # results.append((prediction, str(mask_name)))
-                acc = evaluator.Pixel_Accuracy_Class()
-                sum_accuracy += acc
-                mIoU = evaluator.meanIntersectionOverUnion()
-                sum_mIou += mIoU
-                # print("%s:" % images.g)
-                print("accuracy:  " + str(acc * 100) + " %")
-                print("mIoU:  " + str(mIoU))
-                print("-------------------")
+    # image = cv2.resize(image, dsize=(256, 256))
+    label = cv2.resize(label, dsize=(256, 256))
 
-        sum_accuracy = sum_accuracy / len(test_loader)
-        sum_mIou = sum_mIou / len(test_loader)
+    label[label >= 0.5] = 1  # label被resize后像素值会改变,调整像素值为原来的两类
+    label[label < 0.5] = 0
 
-        sum_accuracy = round(sum_accuracy, 5)
-        sum_mIou = round(sum_mIou, 4)
+    image = img_transforms(image)
+    image = torch.unsqueeze(image, dim=0)
 
-        print("Mean accuracy:  " + str(sum_accuracy * 100) + " %")
-        print("Mean IoU:  " + str(sum_mIou))
+    predict = model(image.to(device)).cpu()
+
+    q = np.squeeze(predict.data.numpy())
+    predict = torch.squeeze(predict, dim=0)  # [1,1,416,416]---->[1,416,416]
+    predict = predict.permute(1, 2, 0)
+    predict = predict.detach().numpy()
+    q[q < 0.5] = 0
+    q[q >= 0.5] = 1
+    prc = predict.argmax(axis=-1)
+
+    save_full = os.path.join('./', 'haha.png')
+    cv2.imwrite(save_full, q * 255)
+    # 进行mIoU和accuracy的评测
+    imgPredict = q
+    imgLabel = label
+
+    metric = Evaluator(2)
+    metric.add_batch(imgLabel,imgPredict)
+    acc = metric.Pixel_Accuracy_Class()
+    sum_1 += acc
+    mIoU = metric.Intersection_over_Union()
+    sum_2 += mIoU
+    # print("%s.jpg :" % test_images[i])
+    print("accuracy:  " + str(acc * 100) + " %")
+    print("mIoU:  " + str(mIoU))
+    print("-------------------")
+
+    # 全部图片平均的accuracy和mIoU
+    sum_1 = sum_1 / len(test_images)
+    sum_2 = sum_2 / len(test_images)
+
+    sum_1 = round(sum_1, 5)
+    sum_2 = round(sum_2, 4)
+
+    print("M accuracy:  " + str(sum_1 * 100) + " %")
+    print("M mIoU:  " + str(sum_2))
+
+    # sum_accuracy = 0
+    # sum_mIou = 0
+    # with torch.no_grad():
+    #     test_loader = DataLoader(
+    #         test_set,
+    #         batch_size=2,
+    #         num_workers=0,
+    #         shuffle=True,
+    #         pin_memory=True
+    #     )
+    #     for images, masks in tqdm(test_loader):
+    #         img_height, img_width = images.shape[-2:]
+    #         init_img = torch.zeros((1, 3, img_height, img_width), device=device)
+    #         model(init_img)
+    #
+    #         t_start = time.time()
+    #         output = model(images.to(device)).cpu()
+    #         t_end = time.time()
+    #         print("inference time: {}".format(t_end - t_start))
+    #         masks[masks >= 0.5] = 1
+    #         masks[masks < 0.5] = 0
+    #
+    #         # output = output.permute(0, 2, 3, 1)
+    #         # output = output.numpy()
+    #         # prediction = np.concatenate(output, axis=1)
+    #         # predictions = output.argmax(dim=1)
+    #         # predictions = torch.squeeze(output)
+    #         # masks = torch.squeeze(masks)
+    #         results = []
+    #         for i in range(output.shape[0]):
+    #
+    #             # prediction = output[i].cpu()
+    #             # predict = prediction.permute(1, 2, 0)
+    #             # prc = predict.numpy()
+    #             # prc = predict.argmax(axis=-1)
+    #             prediction = output[i].cpu()
+    #             prediction = np.squeeze(prediction.data.numpy())
+    #             prc = prediction
+    #             mask = masks[i].cpu()
+    #             mask = torch.squeeze(mask)
+    #             mask = mask.numpy().astype('uint8')
+    #             # prediction = prediction.numpy()
+    #             # prc = np.concatenate(prediction, axis=1)
+    #             # prc = predictions[i].cpu().numpy()
+    #             prc[prc < 0.5] = 0
+    #             prc[prc >= 0.5] = 1
+    #             evaluator.add_batch(pre_image=prc, gt_image=mask)
+    #             # mask_name = masks[i]
+    #             # results.append((prediction, str(mask_name)))
+    #             acc = evaluator.Pixel_Accuracy_Class()
+    #             sum_accuracy += acc
+    #             mIoU = evaluator.meanIntersectionOverUnion()
+    #             sum_mIou += mIoU
+    #             # print("%s:" % images.g)
+    #             print("accuracy:  " + str(acc * 100) + " %")
+    #             print("mIoU:  " + str(mIoU))
+    #             print("-------------------")
+    #
+    #     sum_accuracy = sum_accuracy / len(test_loader)
+    #     sum_mIou = sum_mIou / len(test_loader)
+    #
+    #     sum_accuracy = round(sum_accuracy, 5)
+    #     sum_mIou = round(sum_mIou, 4)
+    #
+    #     print("Mean accuracy:  " + str(sum_accuracy * 100) + " %")
+    #     print("Mean IoU:  " + str(sum_mIou))
 
 
 if __name__ == "__main__":

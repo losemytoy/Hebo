@@ -35,7 +35,7 @@ class Segmentation(data.Dataset):
         image_path = os.path.join(self.image_folder, self.images[idx])
         mask_path = os.path.join(self.mask_folder, self.images[idx])
         image = Image.open(image_path)
-        mask = Image.open(mask_path).convert('L')
+        mask = Image.open(mask_path).convert('L')  # todo: use personal dataset -> mask = Image.open(mask_path)
         # mask = Image.open(mask_path)
         image, mask = self.transforms(image, mask)
         return image, mask
