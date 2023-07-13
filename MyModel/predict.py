@@ -17,14 +17,13 @@ def main():
 
     # check files
     weights_path = './pre_weights/deeplab_checkpoint_0.1396.pth'
-    img_path = 'D:/OneDrive - The University of Nottingham/Dissertation/Data/ResearchData/Test/Snipaste_2023-06-23_10-10-59.png'
-    # img_path = './copernicus_s2_sr_1280.jpg'
+    img_path = 'D:/OneDrive - The University of Nottingham/Dissertation/Data/ResearchData/Images/10.png'
     assert os.path.exists(weights_path), f"weights {weights_path} not found."
     assert os.path.exists(img_path), f"weights {img_path} not found."
 
     # get devices
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
     # create model
     # model = UNet(3, 1)
     model = DeepLabV3plus(num_classes=1, backbone="mobilenet", downsample_factor=16, pretrained=False)

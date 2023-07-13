@@ -1,17 +1,19 @@
 import torch
 import os
 from tqdm import tqdm
-from MyModel.Loss.DICE_BCE_Loss import dice_coeff, DICE_BCE_Loss, BinaryDiceLoss
-from MyModel.Models.UNet import UNet
-from torch import nn
 
+from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-
-from MyModel.Models.DeepLabV3plus import DeepLabV3plus
-from MyModel.Models.ResUNet import ResUNet
 from dataset import Segmentation
 from sklearn.model_selection import train_test_split
+
+from MyModel.Loss.DICE_BCE_Loss import dice_coeff, DICE_BCE_Loss, BinaryDiceLoss
+from MyModel.Models.DeepLabV3plus import DeepLabV3plus
+from MyModel.Models.ResUNet import ResUNet
+from MyModel.Models.Resnet_Deeplab import Resnet_Deeplab
+from MyModel.Models.UNet import UNet
+
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,11 +22,12 @@ from deepflash2 import losses as L
 
 
 def createModel(num_classes, pretrain=False):
-    # model = UNet(3, num_classes)
+    # model = UNet(5, num_classes)
     # model = DeepLabV3plus(num_classes=num_classes, backbone="mobilenet", downsample_factor=16, pretrained=pretrain)
-    model = ResUNet(num_classes=num_classes)
+    # model = ResUNet(num_classes=num_classes)
+    model = Resnet_Deeplab(num_classes=1)
     if pretrain:
-        weights_dict = torch.load('./pre_weights/resUNet_checkpoint_0.2506.pth', map_location='cpu')
+        weights_dict = torch.load('./pre_weights/resUNet_checkpoint_0.6164.pth', map_location='cpu')
         missing_keys, unexpected_keys = model.load_state_dict(weights_dict, strict=False)
         if len(missing_keys) != 0 or len(unexpected_keys) != 0:
             print('missing_keys:', missing_keys)
@@ -39,7 +42,8 @@ def train(epochs=10):
     # root_path = 'D:/OneDrive - The University of Nottingham/Dissertation/Data/Water_Bodies_Dataset/'
     # root_path = 'D:/OneDrive - The University of Nottingham/Dissertation/Data/ResearchData/'
     # root_path = '../ResearchData'
-    root_path = 'D:/OneDrive - The University of Nottingham/Dissertation/Data/5_channels_dataset/'
+    # root_path = '../ResearchData_5C'
+    root_path = 'D:\\OneDrive - The University of Nottingham\\Dissertation\\Data\\5_channels_dataset\\'
 
     image_folder = os.path.join(root_path, 'Images')
     mask_folder = os.path.join(root_path, 'Masks')
@@ -183,8 +187,9 @@ def train(epochs=10):
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend(["Train Loss", "Val Loss"])
+    plt.show()
 
 
 if __name__ == '__main__':
-    epochs = 150
+    epochs = 50
     train(epochs=epochs)

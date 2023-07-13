@@ -5,6 +5,9 @@ import torch
 import torch.utils.data as data
 from PIL import Image
 import cv2
+import tifffile as tif
+import albumentations as A
+
 
 from MyModel.until import transforms
 
@@ -21,23 +24,23 @@ class Segmentation(data.Dataset):
                 transforms.Resize(256, 256),
                 transforms.RandomHorizontalFlip(0.5),
                 # transforms.RandomCrop(220),
+                transforms.ConvertArray(),
+                transforms.ATransform(),
                 transforms.ToTensor(),
-                transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
             ])
         else:
             self.transforms = transforms.Compose([
                 transforms.Resize(256, 256),
+                transforms.ConvertArray(),
                 transforms.ToTensor(),
-                transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
             ])
 
     def __getitem__(self, idx):
         image_path = os.path.join(self.image_folder, self.images[idx])
         mask_path = os.path.join(self.mask_folder, self.images[idx])
-        image = Image.open(image_path)
-        mask = Image.open(mask_path).convert('L')  # todo: use personal dataset -> mask = Image.open(mask_path)
-        # mask = Image.open(mask_path)
-        image, mask = self.transforms(image, mask)
+        image = tif.imread(image_path)
+        mask = tif.imread(mask_path)
+        image, mask = self.transforms(image=image, target=mask)
         return image, mask
 
     def __len__(self):

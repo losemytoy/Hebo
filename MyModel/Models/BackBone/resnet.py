@@ -96,7 +96,7 @@ class Bottleneck(nn.Module):
 
 class ResNet(nn.Module):
     def __init__(self, block, layers, num_classes=1000, zero_init_residual=False, groups=1, width_per_group=64,
-                 replace_stride_with_dilation=None, norm_layer=None):
+                 replace_stride_with_dilation=None, norm_layer=None, aux=False):
         super(ResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -111,7 +111,10 @@ class ResNet(nn.Module):
                              "or a 3-element tuple, got {}".format(replace_stride_with_dilation))
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3)
+        # if aux:
+        #     self.conv1 = nn.Conv2d(1, self.inplanes, kernel_size=7, stride=2, padding=3)
+        # else:
+        self.conv1 = nn.Conv2d(5, self.inplanes, kernel_size=7, stride=2, padding=3)
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -169,30 +172,33 @@ class ResNet(nn.Module):
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
+        low_level_feature1 = x
 
         x = self.layer1(x)
+        low_level_feature2 = x
+
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
+        # x = self.avgpool(x)
+        # x = torch.flatten(x, 1)
+        # x = self.fc(x)
 
-        return x
+        return x, low_level_feature1, low_level_feature2
 
 
-def _resnet(block, layers, **kwargs):
-    model = ResNet(block, layers, **kwargs)
+def _resnet(block, layers, aux, **kwargs):
+    model = ResNet(block, layers, aux=aux, **kwargs)
     return model
 
 
-def resnet50(**kwargs):
+def resnet50(aux, **kwargs):
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
     """
     return _resnet(Bottleneck, [3, 4, 6, 3],
-                   **kwargs)
+                   aux=aux, **kwargs)
 
 
 def resnet101(**kwargs):
@@ -200,3 +206,12 @@ def resnet101(**kwargs):
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
     """
     return _resnet(Bottleneck, [3, 4, 23, 3], **kwargs)
+
+
+if __name__ == '__main__':
+    model = resnet50()
+    input = torch.rand(1, 4, 256, 256)
+    output, low_level_feature1, low_level_feature2 = model(input)  # (1,4,256,256),(1,64,64,64),(1,256,64,64)
+    print(output.size())
+    print(low_level_feature1.size())
+    print(low_level_feature2.size())

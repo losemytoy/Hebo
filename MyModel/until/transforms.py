@@ -3,6 +3,8 @@ import random
 import torch
 from torchvision import transforms
 from torchvision.transforms import functional as F
+from skimage.transform import resize
+import albumentations as A
 
 
 def pad_if_smaller(img, size, fill=0):
@@ -47,9 +49,11 @@ class Resize(object):
         self.width = width
 
     def __call__(self, image, target):
-        resize = transforms.Resize([self.height, self.width])
-        image = resize(image)
-        target = resize(target)
+        # resize = transforms.Resize([self.height, self.width])
+        # image = resize(image)
+        # target = resize(target)
+        image = resize(image, (self.height, self.width, 5))
+        target = resize(target, (self.height, self.width))
         return image, target
 
 
@@ -59,8 +63,10 @@ class RandomHorizontalFlip(object):
 
     def __call__(self, image, target):
         if random.random() < self.flip_prob:
-            image = F.hflip(image)
-            target = F.hflip(target)
+            image = A.Flip(image)
+            target = A.Flip(target)
+            # image = F.hflip(image)
+            # target = F.hflip(target)
         return image, target
 
 
@@ -91,9 +97,7 @@ class ToTensor(object):
     def __call__(self, image, target):
         # image = F.to_tensor(image)
         # target = torch.as_tensor(np.array(target), dtype=torch.int64)
-        image, target = np.array(image), np.array(target)
-        image = np.transpose(image, (2, 0, 1))
-        image = image / 255.0
+
         image = torch.Tensor(image)
         target = np.expand_dims(target, axis=0)
         target = target / 255.0
@@ -109,3 +113,35 @@ class Normalize(object):
     def __call__(self, image, target):
         image = F.normalize(image, mean=self.mean, std=self.std)
         return image, target
+
+
+class ConvertArray(object):
+    def __call__(self, image, target):
+        image, target = np.array(image), np.array(target)
+        image = np.transpose(image, (2, 0, 1))
+        first_four_layers = image[:4]
+        last_layer = image[4]
+        first_four_layers = first_four_layers / 65535.0
+        result = np.concatenate((first_four_layers, last_layer[np.newaxis]), axis=0)
+        target = np.expand_dims(target, axis=0)
+        target = target / 255.0
+        return image, target
+
+
+class ATransform(object):
+    def __init__(self):
+        self.t = A.Compose([
+            A.OneOf([
+                A.MotionBlur(p=0.2),
+                A.MedianBlur(blur_limit=3, p=0.1),
+                A.Blur(blur_limit=3, p=0.1),
+            ], p=0.2),
+            A.OneOf([
+                A.OpticalDistortion(p=0.3),
+                A.GridDistortion(p=0.1),
+            ], p=0.2),
+        ])
+
+    def __call__(self, image, target):
+        augmented = self.t(image=image)
+        return augmented['image'], target
