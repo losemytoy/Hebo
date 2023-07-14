@@ -24,7 +24,7 @@ class Resnet_Deeplab(nn.Module):
         )
 
         self.cat_conv = nn.Sequential(
-            nn.Conv2d(64 + 512, 256, 3, stride=1, padding=1, bias=False),
+            nn.Conv2d(64 + 256, 256, 3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             nn.Dropout(0.5),
@@ -38,14 +38,14 @@ class Resnet_Deeplab(nn.Module):
 
     def forward(self, x):
         H, W = x.size(2), x.size(3)
-        x, y = x.split([4, 1], dim=1)
+        # x, y = x.split([4, 1], dim=1)
         x, low_level_feature1, low_level_feature2 = self.backbone(x)  # (1,2048,8,8) (1,64,64,64) (1,256,64,64)
-        y, y_low_level_feature1, y_low_level_feature2 = self.backbone2(y)  # (1,2048,8,8) (1,64,64,64) (1,256,64,64)
+        # y, y_low_level_feature1, y_low_level_feature2 = self.backbone2(y)  # (1,2048,8,8) (1,64,64,64) (1,256,64,64)
         x = self.aspp(x) #(1,256,8,8)
-        y = self.aspp(y) #(1,256,8,8)
+
         low_level_features = self.shortcut_conv(torch.cat((low_level_feature1, low_level_feature2), dim=1))
         # todo  multiple channel fusion module to combine 'optical' and 'SAR' low level features
-        x = torch.cat((x, y), dim=1)
+        # x = torch.cat((x, y), dim=1)
         x = F.interpolate(x, size=(low_level_features.size(2), low_level_features.size(3)), mode='bilinear',
                           align_corners=True)
         x = self.cat_conv(torch.cat((x, low_level_features), dim=1))
