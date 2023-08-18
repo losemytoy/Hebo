@@ -1,14 +1,21 @@
 import os
 import time
+
+import cv2
 import torch
-from torchvision import transforms
+
+from MyModel.Models.ResUNet import ResUNet
+from MyModel.until import transforms
 import numpy as np
 from PIL import Image
 from matplotlib import pyplot as plt
 
-from MyModel.Models.ResUNet import ResUNet
+from MyModel.Models.AResUNet import AResUNet
 from MyModel.Models.UNet import UNet
 from MyModel.Models.DeepLabV3plus import DeepLabV3plus
+from MyModel.Models.Resnet_Deeplab import Resnet_Deeplab
+
+import tifffile as tif
 
 
 def main():
@@ -16,18 +23,24 @@ def main():
     classes = 1
 
     # check files
-    weights_path = './pre_weights/deeplab_checkpoint_0.1396.pth'
-    img_path = 'D:/OneDrive - The University of Nottingham/Dissertation/Data/ResearchData/Images/10.png'
+    weights_path = '../save_weights/AResUNet_channel_5c_0.6236.pth'
+    # weights_path = './pre_weights/AResUnet_5c_checkpoint_0.6281.pth'
+    # img_path = 'D:\\OneDrive - The University of Nottingham\\Dissertation\\Data\\Test\\Images\\29.tif'
+    img_path = '../Test/Images/6.tif'
+    # img_path = '../Test/RGB/000000000040.tif'
+    # img_path = '../Test/NIR_SAR/66.tif'
     assert os.path.exists(weights_path), f"weights {weights_path} not found."
     assert os.path.exists(img_path), f"weights {img_path} not found."
 
     # get devices
-    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    device = torch.device("cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cpu")
     # create model
     # model = UNet(3, 1)
-    model = DeepLabV3plus(num_classes=1, backbone="mobilenet", downsample_factor=16, pretrained=False)
+    # model = DeepLabV3plus(num_classes=1, backbone="mobilenet", downsample_factor=16, pretrained=False)
+    model = AResUNet(num_classes=1)
     # model = ResUNet(num_classes=1)
+    # model = Resnet_Deeplab(num_classes=1)
 
     # delete weights about aux_classifier
     weights_dict = torch.load(weights_path, map_location='cpu')['model']
@@ -37,26 +50,21 @@ def main():
     model.to(device)
 
     # preprocess image
-    img_transforms = transforms.Compose([transforms.Resize(256),
-                                         transforms.CenterCrop(256), #todo deeplabv3+ don't need this operation, resUNet have to crop the size,
-                                         transforms.ToTensor(),
-                                         transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))])
+    img_transforms = transforms.Compose([
+        # transforms.Resize(256, 256),
+        transforms.ConvertArray(),
+        transforms.ToTensor(),
+    ])
 
-    original_img = Image.open(img_path)
-    img = img_transforms(original_img)
+    original_img = tif.imread(img_path)
+    img, s = img_transforms(original_img, torch.rand(1, 256, 256))
     img = torch.unsqueeze(img, dim=0)
 
     model.eval()
     with torch.no_grad():
-        img_height, img_width = img.shape[-2:]
-        init_img = torch.zeros((1, 3, img_height, img_width), device=device)
-        model(init_img)
-
-        t_start = time.time()
         output = model(img.to(device)).cpu()
-        t_end = time.time()
-        print("inference time: {}".format(t_end - t_start))
-
+        # output,weight = model(img.to(device))
+        # output = output.cpu()
         output = output.permute(0, 2, 3, 1)
         output = output.numpy()
         prediction = np.concatenate(output, axis=1)
@@ -67,11 +75,21 @@ def main():
         # mask.save("predict_result.png")
 
     plt.subplot(121)
-    plt.imshow(np.array(original_img))
+    original_img = np.transpose(original_img, (2, 0, 1))
+    channels = original_img[:3]
+    merged_image = np.stack(channels, axis=-1)
+    merged_image = merged_image / merged_image.max()
+    plt.imshow(merged_image)
+    # plt.imsave('D:/OneDrive - The University of Nottingham/Dissertation/Data/Test/Result/ori29.png', merged_image)
+    plt.axis('off')
     plt.subplot(122)
     plt.imshow(prediction, cmap='gray')
-    plt.show()
-
+    # plt.show()
+    output[output < 0.5] = 0
+    output[output >= 0.5] = 1
+    output1 = np.squeeze(output)
+    # cv2.imwrite('D:/OneDrive - The University of Nottingham/Dissertation/Data/Test/Result/Aresunet_channel_res29.png', output1*255)
+    cv2.imwrite('../result/Aresunet_channel_res6.png', output1*255)
 
 if __name__ == '__main__':
     main()

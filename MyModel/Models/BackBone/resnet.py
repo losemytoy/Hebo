@@ -210,7 +210,7 @@ def resnet101(**kwargs):
 
 if __name__ == '__main__':
     model = resnet50()
-    input = torch.rand(1, 4, 256, 256)
+    input = torch.rand(1, 3, 256, 256)
     output, low_level_feature1, low_level_feature2 = model(input)  # (1,4,256,256),(1,64,64,64),(1,256,64,64)
     print(output.size())
     print(low_level_feature1.size())

@@ -52,8 +52,9 @@ class Resize(object):
         # resize = transforms.Resize([self.height, self.width])
         # image = resize(image)
         # target = resize(target)
-        image = resize(image, (self.height, self.width, 5))
-        target = resize(target, (self.height, self.width))
+        if image.shape[2] == 5:
+            image = resize(image, (self.height, self.width, 5))
+            target = resize(target, (self.height, self.width))
         return image, target
 
 
@@ -99,8 +100,6 @@ class ToTensor(object):
         # target = torch.as_tensor(np.array(target), dtype=torch.int64)
 
         image = torch.Tensor(image)
-        target = np.expand_dims(target, axis=0)
-        target = target / 255.0
         target = torch.Tensor(target)
         return image, target
 
@@ -118,19 +117,32 @@ class Normalize(object):
 class ConvertArray(object):
     def __call__(self, image, target):
         image, target = np.array(image), np.array(target)
-        image = np.transpose(image, (2, 0, 1))
-        first_four_layers = image[:4]
-        last_layer = image[4]
-        first_four_layers = first_four_layers / 65535.0
-        result = np.concatenate((first_four_layers, last_layer[np.newaxis]), axis=0)
+        if image.shape[2] == 5:
+            image = np.transpose(image, (2, 0, 1))
+        if image.shape[0] == 5:
+            first_four_layers = image[:4]
+            last_layer = image[4]
+            first_four_layers = first_four_layers / 65535.0
+            image = np.concatenate((first_four_layers, last_layer[np.newaxis]), axis=0)
+        elif image.shape[0] == 2:
+            first_layer = image[0]
+            last_layer = image[1]
+            first_layer = np.expand_dims(first_layer, axis=0)
+            first_layer = first_layer / 65535.0
+            image = np.concatenate((first_layer, last_layer[np.newaxis]), axis=0)
+        else:
+            image = image / 65535.0
         target = np.expand_dims(target, axis=0)
         target = target / 255.0
-        return image, target
+        # todo delete '.astype('float32')' when train 5 channels data
+        return image.astype('float32'), target.astype('float32')
 
 
 class ATransform(object):
     def __init__(self):
         self.t = A.Compose([
+            # A.RandomRotate90(),
+            # A.Flip(),
             A.OneOf([
                 A.MotionBlur(p=0.2),
                 A.MedianBlur(blur_limit=3, p=0.1),

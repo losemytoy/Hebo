@@ -22,7 +22,7 @@ class Segmentation(data.Dataset):
         if train_val == 'train':
             self.transforms = transforms.Compose([
                 transforms.Resize(256, 256),
-                transforms.RandomHorizontalFlip(0.5),
+                # transforms.RandomHorizontalFlip(0.5),
                 # transforms.RandomCrop(220),
                 transforms.ConvertArray(),
                 transforms.ATransform(),

@@ -35,7 +35,7 @@ import shutil
 
 
 path = 'D:\\OneDrive - The University of Nottingham\\Dissertation\\Data\\5_channels_dataset' #待读取文件的文件夹绝对地址
-save_path = "D:\\OneDrive - The University of Nottingham\\Dissertation\\Data\\5_channels_dataset\\Images"
+save_path = "D:\\OneDrive - The University of Nottingham\\Dissertation\\Data\\Test\\Images"
 existing_files = os.listdir(save_path)
 existing_count = len(existing_files)
 i = 0
@@ -43,15 +43,16 @@ files = os.listdir(path) #获得文件夹中所有文件的名称列表
 list0 = [] #存放path路径中的文件内容
 list1 = [] #存放path中子文件夹的文件内容
 for file in files:
-    path1 = path+"\\"+file
-    files1 = os.listdir(path1)
-    for file1 in files1:
-        if file1 == "images":
-            path2 = path1 + "\\" + file1
-            files2 = os.listdir(path2)
-            for file2 in files2:
-                if file2.endswith('.tif'):
-                    new_index = existing_count + i
-                    new_file_name = '{}.{}'.format(new_index, file2.split('.')[-1])
-                    shutil.copy(os.path.join(path2, file2), os.path.join(save_path, new_file_name))
-                    i += 1
+    if file == "Kamchai":
+        path1 = path+"\\"+file
+        files1 = os.listdir(path1)
+        for file1 in files1:
+            if file1 == "images":
+                path2 = path1 + "\\" + file1
+                files2 = os.listdir(path2)
+                for file2 in files2:
+                    if file2.endswith('.tif'):
+                        new_index = existing_count + i
+                        new_file_name = '{}.{}'.format(new_index, file2.split('.')[-1])
+                        shutil.copy(os.path.join(path2, file2), os.path.join(save_path, new_file_name))
+                        i += 1
